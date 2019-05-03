@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2016 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2019 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -91,8 +91,7 @@ Emscripten_CreateDevice(int devindex)
 
     device->PumpEvents = Emscripten_PumpEvents;
 
-    device->CreateWindow = Emscripten_CreateWindow;
-    /*device->CreateWindowFrom = Emscripten_CreateWindowFrom;*/
+    device->CreateSDLWindow = Emscripten_CreateWindow;
     device->SetWindowTitle = Emscripten_SetWindowTitle;
     /*device->SetWindowIcon = Emscripten_SetWindowIcon;
     device->SetWindowPosition = Emscripten_SetWindowPosition;*/
@@ -111,6 +110,7 @@ Emscripten_CreateDevice(int devindex)
     device->UpdateWindowFramebuffer = Emscripten_UpdateWindowFramebuffer;
     device->DestroyWindowFramebuffer = Emscripten_DestroyWindowFramebuffer;
 
+#if SDL_VIDEO_OPENGL_EGL
     device->GL_LoadLibrary = Emscripten_GLES_LoadLibrary;
     device->GL_GetProcAddress = Emscripten_GLES_GetProcAddress;
     device->GL_UnloadLibrary = Emscripten_GLES_UnloadLibrary;
@@ -121,6 +121,7 @@ Emscripten_CreateDevice(int devindex)
     device->GL_SwapWindow = Emscripten_GLES_SwapWindow;
     device->GL_DeleteContext = Emscripten_GLES_DeleteContext;
     device->GL_GetDrawableSize = Emscripten_GLES_GetDrawableSize;
+#endif
 
     device->free = Emscripten_DeleteDevice;
 
@@ -155,7 +156,6 @@ Emscripten_VideoInit(_THIS)
         return -1;
     }
 
-    SDL_zero(mode);
     SDL_AddDisplayMode(&_this->displays[0], &mode);
 
     Emscripten_InitMouse();
@@ -205,20 +205,21 @@ Emscripten_CreateWindow(_THIS, SDL_Window * window)
     scaled_w = SDL_floor(window->w * wdata->pixel_ratio);
     scaled_h = SDL_floor(window->h * wdata->pixel_ratio);
 
-    emscripten_set_canvas_size(scaled_w, scaled_h);
-
+    /* set a fake size to check if there is any CSS sizing the canvas */
+    emscripten_set_canvas_element_size(NULL, 1, 1);
     emscripten_get_element_css_size(NULL, &css_w, &css_h);
 
-    wdata->external_size = SDL_floor(css_w) != scaled_w || SDL_floor(css_h) != scaled_h;
+    wdata->external_size = SDL_floor(css_w) != 1 || SDL_floor(css_h) != 1;
 
     if ((window->flags & SDL_WINDOW_RESIZABLE) && wdata->external_size) {
         /* external css has resized us */
         scaled_w = css_w * wdata->pixel_ratio;
         scaled_h = css_h * wdata->pixel_ratio;
 
-        emscripten_set_canvas_size(scaled_w, scaled_h);
         SDL_SendWindowEvent(window, SDL_WINDOWEVENT_RESIZED, css_w, css_h);
     }
+
+    emscripten_set_canvas_element_size(NULL, scaled_w, scaled_h);
 
     /* if the size is not being controlled by css, we need to scale down for hidpi */
     if (!wdata->external_size) {
@@ -228,6 +229,7 @@ Emscripten_CreateWindow(_THIS, SDL_Window * window)
         }
     }
 
+#if SDL_VIDEO_OPENGL_EGL
     if (window->flags & SDL_WINDOW_OPENGL) {
         if (!_this->egl_data) {
             if (SDL_GL_LoadLibrary(NULL) < 0) {
@@ -240,6 +242,7 @@ Emscripten_CreateWindow(_THIS, SDL_Window * window)
             return SDL_SetError("Could not create GLES window surface");
         }
     }
+#endif
 
     wdata->window = window;
 
@@ -263,8 +266,10 @@ static void Emscripten_SetWindowSize(_THIS, SDL_Window * window)
     if (window->driverdata) {
         data = (SDL_WindowData *) window->driverdata;
         /* update pixel ratio */
-        data->pixel_ratio = emscripten_get_device_pixel_ratio();
-        emscripten_set_canvas_size(window->w * data->pixel_ratio, window->h * data->pixel_ratio);
+        if (window->flags & SDL_WINDOW_ALLOW_HIGHDPI) {
+            data->pixel_ratio = emscripten_get_device_pixel_ratio();
+        }
+        emscripten_set_canvas_element_size(NULL, window->w * data->pixel_ratio, window->h * data->pixel_ratio);
 
         /*scale canvas down*/
         if (!data->external_size && data->pixel_ratio != 1.0f) {
@@ -282,10 +287,16 @@ Emscripten_DestroyWindow(_THIS, SDL_Window * window)
         data = (SDL_WindowData *) window->driverdata;
 
         Emscripten_UnregisterEventHandlers(data);
+#if SDL_VIDEO_OPENGL_EGL
         if (data->egl_surface != EGL_NO_SURFACE) {
             SDL_EGL_DestroySurface(_this, data->egl_surface);
             data->egl_surface = EGL_NO_SURFACE;
         }
+#endif
+
+        /* We can't destroy the canvas, so resize it to zero instead */
+        emscripten_set_canvas_element_size(NULL, 0, 0);
+
         SDL_free(window->driverdata);
         window->driverdata = NULL;
     }
@@ -336,7 +347,7 @@ static void
 Emscripten_SetWindowTitle(_THIS, SDL_Window * window) {
     EM_ASM_INT({
       if (typeof Module['setWindowTitle'] !== 'undefined') {
-        Module['setWindowTitle'](Module['Pointer_stringify']($0));
+        Module['setWindowTitle'](UTF8ToString($0));
       }
       return 0;
     }, window->title);

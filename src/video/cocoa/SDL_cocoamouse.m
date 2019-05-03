@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2016 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2019 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -26,6 +26,7 @@
 #include "SDL_events.h"
 #include "SDL_cocoamouse.h"
 #include "SDL_cocoamousetap.h"
+#include "SDL_cocoavideo.h"
 
 #include "../../events/SDL_mouse_c.h"
 
@@ -314,14 +315,8 @@ Cocoa_GetGlobalMouseState(int *x, int *y)
     const NSPoint cocoaLocation = [NSEvent mouseLocation];
     Uint32 retval = 0;
 
-    for (NSScreen *screen in [NSScreen screens]) {
-        NSRect frame = [screen frame];
-        if (NSMouseInRect(cocoaLocation, frame, NO)) {
-            *x = (int) cocoaLocation.x;
-            *y = (int) ((frame.origin.y + frame.size.height) - cocoaLocation.y);
-            break;
-        }
-    }
+    *x = (int) cocoaLocation.x;
+    *y = (int) (CGDisplayPixelsHigh(kCGDirectMainDisplay) - cocoaLocation.y);
 
     retval |= (cocoaButtons & (1 << 0)) ? SDL_BUTTON_LMASK : 0;
     retval |= (cocoaButtons & (1 << 1)) ? SDL_BUTTON_RMASK : 0;
@@ -363,10 +358,10 @@ void
 Cocoa_HandleMouseEvent(_THIS, NSEvent *event)
 {
     switch ([event type]) {
-        case NSMouseMoved:
-        case NSLeftMouseDragged:
-        case NSRightMouseDragged:
-        case NSOtherMouseDragged:
+        case NSEventTypeMouseMoved:
+        case NSEventTypeLeftMouseDragged:
+        case NSEventTypeRightMouseDragged:
+        case NSEventTypeOtherMouseDragged:
             break;
 
         default:
@@ -441,7 +436,7 @@ Cocoa_HandleMouseWheel(SDL_Window *window, NSEvent *event)
     } else if (y < 0) {
         y = SDL_floor(y);
     }
-    SDL_SendMouseWheel(window, mouse->mouseID, (int)x, (int)y, direction);
+    SDL_SendMouseWheel(window, mouse->mouseID, x, y, direction);
 }
 
 void
