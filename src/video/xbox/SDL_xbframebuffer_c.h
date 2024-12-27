@@ -18,40 +18,10 @@
      misrepresented as being the original software.
   3. This notice may not be removed or altered from any source distribution.
 */
+#include "../../SDL_internal.h"
 
-#ifndef _SDL_config_h
-#define _SDL_config_h
+extern int SDL_XBOX_CreateWindowFramebuffer(_THIS, SDL_Window * window, Uint32 * format, void ** pixels, int *pitch);
+extern int SDL_XBOX_UpdateWindowFramebuffer(_THIS, SDL_Window * window, const SDL_Rect * rects, int numrects);
+extern void SDL_XBOX_DestroyWindowFramebuffer(_THIS, SDL_Window * window);
 
-#include "SDL_platform.h"
-
-/**
- *  \file SDL_config.h
- */
-
-/* Add any platform that doesn't build using the configure system. */
-#ifdef USING_PREMAKE_CONFIG_H
-#include "SDL_config_premake.h"
-#elif defined(__WIN32__)
-#include "SDL_config_windows.h"
-#elif defined(__WINRT__)
-#include "SDL_config_winrt.h"
-#elif defined(__MACOSX__)
-#include "SDL_config_macosx.h"
-#elif defined(__IPHONEOS__)
-#include "SDL_config_iphoneos.h"
-#elif defined(__ANDROID__)
-#include "SDL_config_android.h"
-#elif defined(__PSP__)
-#include "SDL_config_psp.h"
-#elif defined(__XBOX__)
-#include "SDL_config_xbox.h"
-#else
-/* This is a minimal configuration just to get SDL running on new platforms */
-#include "SDL_config_minimal.h"
-#endif /* platform config */
-
-#ifdef USING_GENERATED_CONFIG_H
-#error Wrong SDL_config.h, check your include path?
-#endif
-
-#endif /* _SDL_config_h */
+/* vi: set ts=4 sw=4 expandtab: */

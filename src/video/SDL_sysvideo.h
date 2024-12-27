@@ -417,6 +417,9 @@ extern VideoBootStrap VIVANTE_bootstrap;
 #if SDL_VIDEO_DRIVER_EMSCRIPTEN
 extern VideoBootStrap Emscripten_bootstrap;
 #endif
+#if SDL_VIDEO_DRIVER_XBOX
+extern VideoBootStrap XBOX_bootstrap;
+#endif
 
 extern SDL_VideoDevice *SDL_GetVideoDevice(void);
 extern int SDL_AddBasicVideoDisplay(const SDL_DisplayMode * desktop_mode);
